@@ -1,0 +1,494 @@
+@baseUrl = http://localhost:3000
+
+###
+# SETUP (только при пустой базе)
+###
+
+### Проверка статуса setup
+GET {{baseUrl}}/api/setup/status
+
+### Создание первого админа
+# @name setup
+POST {{baseUrl}}/api/setup
+Content-Type: application/json
+
+{
+  "name": "Владелец",
+  "email": "owner@example.com",
+  "password": "secret123"
+}
+
+### Повторный вызов setup (ожидаем 409)
+POST {{baseUrl}}/api/setup
+Content-Type: application/json
+
+{
+  "name": "Хакер",
+  "email": "hacker@example.com",
+  "password": "secret123"
+}
+
+### Setup без пароля (ожидаем 400)
+POST {{baseUrl}}/api/setup
+Content-Type: application/json
+
+{
+  "name": "Без пароля",
+  "email": "nopass@example.com"
+}
+
+###
+# АУТЕНТИФИКАЦИЯ
+###
+
+### Логин админа (сохраняем ответ под именем login)
+# @name login
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "owner@example.com",
+  "password": "secret123"
+}
+
+### Refresh
+POST {{baseUrl}}/api/auth/refresh
+
+### Logout
+POST {{baseUrl}}/api/auth/logout
+
+### Извлекаем токен из ответа логина
+@authToken = {{login.response.body.accessToken}}
+
+### Логин с неверным паролем (ожидаем 401)
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "owner@example.com",
+  "password": "wrongpassword"
+}
+
+### Логин несуществующего (ожидаем 401)
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "nobody@example.com",
+  "password": "secret123"
+}
+
+###
+# USERS (все защищены токеном)
+###
+
+### Смена пароля
+PATCH {{baseUrl}}/api/users/me/password
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "currentPassword": "secret123",
+  "newPassword": "newsecret456"
+}
+
+### Проверка: логин со старым паролем
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "owner@example.com",
+  "password": "secret123"
+}
+
+### Проверка: логин с новым паролем
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "owner@example.com",
+  "password": "newsecret456"
+}
+
+### Неверный текущий пароль (ожидаем 401)
+PATCH {{baseUrl}}/api/users/me/password
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "currentPassword": "wrongpassword",
+  "newPassword": "newsecret789"
+}
+
+### Короткий новый пароль (ожидаем 400)
+PATCH {{baseUrl}}/api/users/me/password
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "currentPassword": "newsecret456",
+  "newPassword": "123"
+}
+
+
+### Новый пароль совпадает со старым (ожидаем 400)
+PATCH {{baseUrl}}/api/users/me/password
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "currentPassword": "newsecret456",
+  "newPassword": "newsecret456"
+}
+
+### Без токена (ожидаем 401)
+PATCH {{baseUrl}}/api/users/me/password
+Content-Type: application/json
+
+{
+  "currentPassword": "newsecret456",
+  "newPassword": "newsecret789"
+}
+
+
+
+
+
+### Получить свой профиль (под админом)
+GET {{baseUrl}}/api/users/me
+Authorization: Bearer {{authToken}}
+
+### Сброс пароля без токена (ожидаем 401)
+PATCH {{baseUrl}}/api/users/3/password
+Content-Type: application/json
+
+{
+  "newPassword": "hacked123"
+}
+
+### Короткий пароль (ожидаем 400)
+PATCH {{baseUrl}}/api/users/3/password
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "newPassword": "123"
+}
+
+### Сброс пароля админом
+PATCH {{baseUrl}}/api/users/3/password
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "newPassword": "brandnew789"
+}
+
+### Новый пароль совпадает со старым (ожидаем 400)
+PATCH {{baseUrl}}/api/users/3/password
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "newPassword": "brandnew789"
+}
+
+### Проверить, что новый пароль работает
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "operator@example.com",
+  "password": "brandnew789"
+}
+
+### Проверить, что старый пароль больше не работает
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "actor@example.com",
+  "password": "secret123"
+}
+
+### Получить свой профиль под обычным пользователем 
+# Cначала залогиниться под operator
+# @name usLogin
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "operator@example.com",
+  "password": "secret123"
+}
+
+###
+
+@userToken = {{usLogin.response.body.accessToken}}
+ 
+### Потом получить профиль под operator
+GET {{baseUrl}}/api/users/me
+Authorization: Bearer {{userToken}}
+
+
+### Сброс пароля обычным пользователем (ожидаем 403)
+PATCH {{baseUrl}}/api/users/3/password
+Content-Type: application/json
+Authorization: Bearer {{userToken}}
+
+{
+  "newPassword": "hacked123"
+}
+
+
+
+### Все пользователи
+GET {{baseUrl}}/api/users
+Authorization: Bearer {{authToken}}
+
+### Все пользователи без токена (ожидаем 401)
+GET {{baseUrl}}/api/users
+
+### Один пользователь по id
+GET {{baseUrl}}/api/users/2
+Authorization: Bearer {{authToken}}
+
+### Несуществующий пользователь (ожидаем 404)
+GET {{baseUrl}}/api/users/999
+Authorization: Bearer {{authToken}}
+
+### Некорректный id (ожидаем 400)
+GET {{baseUrl}}/api/users/abc
+Authorization: Bearer {{authToken}}
+
+### Создание обычного пользователя (админом)
+POST {{baseUrl}}/api/users
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "name": "Оператор",
+  "email": "operator@example.com",
+  "password": "secret123"
+}
+
+### Создание пользователя с ролью ADMIN
+POST {{baseUrl}}/api/users
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "name": "Второй админ",
+  "email": "admin2@example.com",
+  "password": "secret123",
+  "systemRole": "ADMIN"
+}
+
+### Создание с дублирующимся email (ожидаем 409)
+POST {{baseUrl}}/api/users
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "name": "Дубль",
+  "email": "operator@example.com",
+  "password": "secret123"
+}
+
+### Создание без пароля (ожидаем 400)
+POST {{baseUrl}}/api/users
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "name": "Без пароля",
+  "email": "nopass@example.com"
+}
+
+### Создание с невалидной ролью (ожидаем 400)
+POST {{baseUrl}}/api/users
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "name": "Странный",
+  "email": "weird@example.com",
+  "password": "secret123",
+  "systemRole": "SUPERUSER"
+}
+
+### Создание без токена (ожидаем 401)
+POST {{baseUrl}}/api/users
+Content-Type: application/json
+
+{
+  "name": "Без токена",
+  "email": "notoken@example.com",
+  "password": "secret123"
+}
+
+### Обновление пользователя (частичное)
+PUT {{baseUrl}}/api/users/2
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "name": "Обновлённое имя"
+}
+
+### Обновление несуществующего (ожидаем 404)
+PUT {{baseUrl}}/api/users/999
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "name": "Призрак"
+}
+
+### Обновление с пустым телом (ожидаем 400)
+PUT {{baseUrl}}/api/users/2
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{}
+
+### Удаление пользователя
+DELETE {{baseUrl}}/api/users/3
+Authorization: Bearer {{authToken}}
+
+### Удаление несуществующего (ожидаем 404)
+DELETE {{baseUrl}}/api/users/999
+Authorization: Bearer {{authToken}}
+
+
+
+
+
+
+###
+# Roles
+###
+
+### Посмотреть роли пользователя
+GET {{baseUrl}}/api/users/2/business-roles
+Authorization: Bearer {{authToken}}
+
+
+### Сменить системную роль
+PATCH {{baseUrl}}/api/users/3/system-role
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "systemRole": "ADMIN"
+}
+
+### Назначить бизнес-роль
+POST {{baseUrl}}/api/users/3/business-roles
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "businessRole": "OPERATOR"
+}
+
+### Назначить вторую роль тому же пользователю
+POST {{baseUrl}}/api/users/3/business-roles
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "businessRole": "ACTOR"
+}
+
+### Проверить, что обе роли есть:
+GET {{baseUrl}}/api/users/3/business-roles
+Authorization: Bearer {{authToken}}
+
+### Попробовать назначить ту же роль повторно
+POST {{baseUrl}}/api/users/3/business-roles
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "businessRole": "OPERATOR"
+}
+
+### Снять роль
+DELETE {{baseUrl}}/api/users/3/business-roles/ACTOR
+Authorization: Bearer {{authToken}}
+
+### Попробовать снять несуществующую роль
+DELETE {{baseUrl}}/api/users/3/business-roles/ACTOR
+Authorization: Bearer {{authToken}}
+
+
+
+
+
+
+###
+# QUESTS
+###
+
+### Все квесты
+GET {{baseUrl}}/api/quests
+Authorization: Bearer {{authToken}}
+
+### Один квест по id
+GET {{baseUrl}}/api/quests/1
+Authorization: Bearer {{authToken}}
+
+### Несуществующий квест (ожидаем 404)
+GET {{baseUrl}}/api/quests/999
+Authorization: Bearer {{authToken}}
+
+### Создание квеста
+POST {{baseUrl}}/api/quests
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "title": "Побег из тюрьмы",
+  "description": "Классический квест на 60 минут для команды из 4 человек"
+}
+
+### Создание без title (ожидаем 400)
+POST {{baseUrl}}/api/quests
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "description": "Без названия"
+}
+
+### Обновление квеста (частичное)
+PUT {{baseUrl}}/api/quests/1
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "title": "Побег из тюрьмы (обновлено)"
+}
+
+### Обновление несуществующего (ожидаем 404)
+PUT {{baseUrl}}/api/quests/999
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "title": "Призрак"
+}
+
+### Удаление квеста
+DELETE {{baseUrl}}/api/quests/3
+Authorization: Bearer {{authToken}}
+
+
+
+###
+# HEALTH
+###
+
+### Проверка, что сервер жив
+GET {{baseUrl}}/health

@@ -1,0 +1,11 @@
+/node_modules
+/src/generated/prisma
+.agents/skills
+.claude/skills
+.windsurf/skills
+dist/
+src/generated/prisma/
+
+
+instr.md
+.env

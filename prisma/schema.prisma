@@ -1,0 +1,62 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum SystemRole {
+  ADMIN
+  USER
+}
+
+enum BusinessRole {
+  OPERATOR
+  ACTOR
+}
+
+model User {
+  id            Int      @id @default(autoincrement())
+  vkId          String?  @unique
+  name          String
+  email         String   @unique
+  passwordHash  String
+  systemRole    SystemRole @default(USER)
+  createdAt     DateTime @default(now())
+  businessRoles BusinessRoleOnUser[]  // Связь многие-ко-многим с бизнес-ролями
+  refreshTokens RefreshToken[]
+}
+
+model RefreshToken {
+  id           String   @id @default(cuid())
+  userId       Int
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash    String   @unique  // bcrypt-хеш refresh-токена
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+  revokedAt    DateTime?
+
+  @@index([userId])
+}
+
+model BusinessRoleOnUser {
+  userId       Int
+  businessRole BusinessRole
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, businessRole])
+}
+
+model Quest {
+  id          Int      @id @default(autoincrement())
+  title       String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+}
