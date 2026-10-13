@@ -171,7 +171,31 @@ export const availabilityService = {
     const fromDate = new Date(from + 'T00:00:00.000Z');
     const toDate = new Date(to + 'T00:00:00.000Z');
 
-    // берём все отметки
+    // Загружаем всех назначенных на квест (для missingUsers)
+    const questUsers = await prisma.userQuest.findMany({
+      where: { questId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            businessRoles: {
+              select: { businessRole: true },
+            },
+          },
+        },
+      },
+    });
+
+    const assignees = questUsers
+      .filter((uq) => uq.user.businessRoles.length > 0)
+      .map((uq) => ({
+        id: uq.user.id,
+        name: uq.user.name,
+        roles: uq.user.businessRoles.map((br) => br.businessRole),
+      }));
+
+    // Все отметки за период (и canWork: true, и false)
     const availabilities = await prisma.availability.findMany({
       where: {
         questId,
@@ -190,15 +214,20 @@ export const availabilityService = {
       },
     });
 
-    // Карта: "YYYY-MM-DD_slotId" -> массив записей доступности
+    // Карта: "YYYY-MM-DD_slotId" -> массив записей
     const map = new Map<string, typeof availabilities>();
+    // Карта: "YYYY-MM-DD" -> Set userId, которые что-то отметили в этот день
+    const markedByDay = new Map<string, Set<number>>();
+
     for (const av of availabilities) {
       const dateKey = av.date.toISOString().split('T')[0];
-      const key = `${dateKey}_${av.slotId}`;
-      if (!map.has(key)) {
-        map.set(key, []);
-      }
-      map.get(key)!.push(av);
+
+      const slotKey = `${dateKey}_${av.slotId}`;
+      if (!map.has(slotKey)) map.set(slotKey, []);
+      map.get(slotKey)!.push(av);
+
+      if (!markedByDay.has(dateKey)) markedByDay.set(dateKey, new Set());
+      markedByDay.get(dateKey)!.add(av.userId);
     }
 
     const days = [];
@@ -210,7 +239,6 @@ export const availabilityService = {
         const key = `${dateKey}_${qs.slotId}`;
         const records = map.get(key) ?? [];
 
-        // Разделяем по ролям и по canWork
         const operatorsAvailable = records
           .filter(
             (r) =>
@@ -246,14 +274,14 @@ export const availabilityService = {
         const operatorsOk = operatorsAvailable.length >= quest.operatorsNeeded;
         const actorsOk = actorsAvailable.length >= quest.actorsNeeded;
 
-        // Статус: различаем "пусто" (никто не заполнил) и "все отказались"
         const totalOperatorResponses =
           operatorsAvailable.length + operatorsUnavailable.length;
-        const totalActorResponses = actorsAvailable.length + actorsUnavailable.length;
+        const totalActorResponses =
+          actorsAvailable.length + actorsUnavailable.length;
 
         let status: 'covered' | 'understaffed' | 'empty' | 'declined';
         if (totalOperatorResponses === 0 && totalActorResponses === 0) {
-          status = 'empty'; // никто не заполнил
+          status = 'empty';
         } else if (operatorsOk && actorsOk) {
           status = 'covered';
         } else if (
@@ -261,7 +289,7 @@ export const availabilityService = {
           actorsAvailable.length === 0 &&
           (totalOperatorResponses > 0 || totalActorResponses > 0)
         ) {
-          status = 'declined'; // все, кто ответил, отказались
+          status = 'declined';
         } else {
           status = 'understaffed';
         }
@@ -290,7 +318,15 @@ export const availabilityService = {
         };
       });
 
-      days.push({ date: dateKey, slots });
+      const marked = markedByDay.get(dateKey) ?? new Set<number>();
+      const missingUsers = assignees.filter((a) => !marked.has(a.id));
+
+      days.push({
+        date: dateKey,
+        missingUsers,
+        slots,
+      });
+
       cursor.setUTCDate(cursor.getUTCDate() + 1);
     }
 
@@ -301,6 +337,7 @@ export const availabilityService = {
         operatorsNeeded: quest.operatorsNeeded,
         actorsNeeded: quest.actorsNeeded,
       },
+      assignees,
       days,
     };
   }
