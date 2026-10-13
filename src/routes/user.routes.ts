@@ -14,6 +14,8 @@ import {
   businessRoleSchema,
 } from '../schemas/user.schema';
 
+import userQuestRoutes from './userQuest.routes';
+
 const router = Router();
 
 // Все роуты требуют аутентификации
@@ -21,6 +23,9 @@ router.use(authenticate);
 
 router.get('/me', userController.getMe);
 router.patch('/me/password', validateBody(changePasswordSchema), userController.changeOwnPassword); // Роуты для текущего пользователя — ДО /:id
+
+// Вложенный роутер: /api/users/:userId/quests
+router.use('/:userId/quests', userQuestRoutes);
 
 // Чтение — доступно любому авторизованному
 router.get('/', userController.getAllUsers);

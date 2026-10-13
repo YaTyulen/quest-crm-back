@@ -486,6 +486,332 @@ Authorization: Bearer {{authToken}}
 
 
 
+### Все слоты
+GET {{baseUrl}}/api/slots
+Authorization: Bearer {{authToken}}
+
+### Один слот
+GET {{baseUrl}}/api/slots/1
+Authorization: Bearer {{authToken}}
+
+### Создание слота
+POST {{baseUrl}}/api/slots
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "time": "08:00",
+  "order": 0,
+  "isActive": true
+}
+
+### Создание с невалидным временем (ожидаем 400)
+POST {{baseUrl}}/api/slots
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "time": "25:99",
+  "order": 1
+}
+
+### Обновление слота
+PUT {{baseUrl}}/api/slots/1
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "isActive": false
+}
+
+### Удаление слота (не используется в квестах)
+DELETE {{baseUrl}}/api/slots/8
+Authorization: Bearer {{authToken}}
+
+### Удаление слота, используемого в квестах (ожидаем 409)
+DELETE {{baseUrl}}/api/slots/1
+Authorization: Bearer {{authToken}}
+
+
+
+
+
+
+### Слоты квеста «Побег из тюрьмы» (id 5)
+GET {{baseUrl}}/api/quests/5/slots
+Authorization: Bearer {{authToken}}
+
+### Слоты несуществующего квеста (ожидаем 404)
+GET {{baseUrl}}/api/quests/999/slots
+Authorization: Bearer {{authToken}}
+
+### Заменить сетку слотов (только 4 слота)
+PUT {{baseUrl}}/api/quests/5/slots
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "slotIds": [1, 2, 3, 4]
+}
+
+### Проверить, что сетка обновилась
+GET {{baseUrl}}/api/quests/5/slots
+Authorization: Bearer {{authToken}}
+
+### Вернуть все 7 слотов
+PUT {{baseUrl}}/api/quests/5/slots
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "slotIds": [1, 2, 3, 4, 5, 6, 7]
+}
+
+### Несуществующий slotId (ожидаем 400)
+PUT {{baseUrl}}/api/quests/1/slots
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "slotIds": [1, 999]
+}
+
+### Пустой массив (очистить сетку)
+PUT {{baseUrl}}/api/quests/1/slots
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "slotIds": []
+}
+
+### Без токена (ожидаем 401)
+GET {{baseUrl}}/api/quests/1/slots
+
+### Без админских прав (ожидаем 403)
+PUT {{baseUrl}}/api/quests/1/slots
+Content-Type: application/json
+Authorization: Bearer {{userToken}}
+
+{
+  "slotIds": [1]
+}
+
+
+
+
+
+
+
+### Квесты пользователя «Оператор» (id 3)
+GET {{baseUrl}}/api/users/10/quests
+Authorization: Bearer {{authToken}}
+
+### Квесты несуществующего пользователя (ожидаем 404)
+GET {{baseUrl}}/api/users/999/quests
+Authorization: Bearer {{authToken}}
+
+### Заменить набор квестов (только «Побег»)
+PUT {{baseUrl}}/api/users/10/quests
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "questIds": [5]
+}
+
+### Проверить, что набор обновился
+GET {{baseUrl}}/api/users/10/quests
+Authorization: Bearer {{authToken}}
+
+### Вернуть оба квеста
+PUT {{baseUrl}}/api/users/10/quests
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "questIds": [5, 6]
+}
+
+### Несуществующий questId (ожидаем 400)
+PUT {{baseUrl}}/api/users/10/quests
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "questIds": [1, 999]
+}
+
+### Очистить набор квестов
+PUT {{baseUrl}}/api/users/3/quests
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "questIds": []
+}
+
+### Без админских прав (ожидаем 403)
+PUT {{baseUrl}}/api/users/3/quests
+Content-Type: application/json
+Authorization: Bearer {{userToken}}
+
+{
+  "questIds": [1]
+}
+
+
+
+
+### Получить настройки
+GET {{baseUrl}}/api/settings
+Authorization: Bearer {{authToken}}
+
+### Обновить настройки (горизонт 30 дней)
+PUT {{baseUrl}}/api/settings
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "availabilityHorizonDays": 30
+}
+
+### Вернуть 14 дней
+PUT {{baseUrl}}/api/settings
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "availabilityHorizonDays": 14
+}
+
+### Слишком большое значение (ожидаем 400)
+PUT {{baseUrl}}/api/settings
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "availabilityHorizonDays": 365
+}
+
+### Ноль (ожидаем 400)
+PUT {{baseUrl}}/api/settings
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "availabilityHorizonDays": 0
+}
+
+### Не число (ожидаем 400)
+PUT {{baseUrl}}/api/settings
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "availabilityHorizonDays": "много"
+}
+
+### Без админских прав (ожидаем 403)
+PUT {{baseUrl}}/api/settings
+Content-Type: application/json
+Authorization: Bearer {{userToken}}
+
+{
+  "availabilityHorizonDays": 30
+}
+
+
+
+
+
+
+
+
+### авторизация под оператором
+# @name login
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "operator@example.com",
+  "password": "secret123"
+}
+
+
+### Извлекаем токен из ответа логина
+@operatorToken = {{login.response.body.accessToken}}
+
+
+### Моя доступность (Оператор, квест «Побег», 3 дня)
+GET {{baseUrl}}/api/availability/me?questId=5&from=2026-10-08&to=2026-10-10
+Authorization: Bearer {{operatorToken}}
+
+### Сохранить доступность
+PUT {{baseUrl}}/api/availability/me
+Content-Type: application/json
+Authorization: Bearer {{operatorToken}}
+
+{
+  "items": [
+    { "questId": 5, "slotId": 1, "date": "2026-10-08", "canWork": true },
+    { "questId": 5, "slotId": 2, "date": "2026-10-08", "canWork": false },
+    { "questId": 5, "slotId": 4, "date": "2026-10-08", "canWork": true }
+  ]
+}
+
+### Проверить, что сохранилось
+GET {{baseUrl}}/api/availability/me?questId=5&from=2026-10-08&to=2026-10-08
+Authorization: Bearer {{operatorToken}}
+
+### Квест, на котором не работаю (ожидаем 403)
+PUT {{baseUrl}}/api/availability/me
+Content-Type: application/json
+Authorization: Bearer {{actorToken}}
+
+{
+  "items": [
+    { "questId": 2, "slotId": 3, "date": "2026-10-08", "canWork": true }
+  ]
+}
+
+### Слот не из сетки квеста (ожидаем 400)
+PUT {{baseUrl}}/api/availability/me
+Content-Type: application/json
+Authorization: Bearer {{operatorToken}}
+
+{
+  "items": [
+    { "questId": 5, "slotId": 7, "date": "2026-10-08", "canWork": true }
+  ]
+}
+
+### Дата в прошлом (ожидаем 400)
+PUT {{baseUrl}}/api/availability/me
+Content-Type: application/json
+Authorization: Bearer {{operatorToken}}
+
+{
+  "items": [
+    { "questId": 5, "slotId": 1, "date": "2020-01-01", "canWork": true }
+  ]
+}
+
+### Дата за горизонтом (ожидаем 400)
+PUT {{baseUrl}}/api/availability/me
+Content-Type: application/json
+Authorization: Bearer {{operatorToken}}
+
+{
+  "items": [
+    { "questId": 5, "slotId": 1, "date": "2027-01-01", "canWork": true }
+  ]
+}
+
+
+
+
+
 ###
 # HEALTH
 ###

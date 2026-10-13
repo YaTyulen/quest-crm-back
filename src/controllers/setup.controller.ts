@@ -3,7 +3,7 @@ import { setupService } from '../services/setup.service';
 import { asyncHandler } from '../utils/asyncHandler';
 
 export const setupController = {
-  getStatus: asyncHandler(async (req: Request, res: Response) => {
+  getStatus: asyncHandler(async (_req: Request, res: Response) => {
     const required = await setupService.isSetupRequired();
     res.status(200).json({ setupRequired: required });
   }),

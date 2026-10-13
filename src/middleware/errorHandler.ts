@@ -4,10 +4,10 @@ import { Prisma } from '../generated/prisma/client';
 
 export function errorHandler(
   err: unknown,
-  req: Request,
+  _req: Request,
   res: Response,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  next: NextFunction
+  _next: NextFunction
 ) {
   // Наши кастомные ошибки
   if (err instanceof HttpError) {

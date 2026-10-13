@@ -4,7 +4,7 @@ import { prisma } from '../lib/prisma';
 import { UnauthorizedError } from '../errors/HttpError';
 import { generateAccessToken, generateRefreshToken, saveRefreshToken } from './token.service';
 
-const SALT_ROUNDS = 10;
+// const SALT_ROUNDS = 10;
 
 export const authService = {
   async login(data: { email: string; password: string }) {

@@ -3,7 +3,7 @@ import { AuthRequest } from './authenticate';
 import { ForbiddenError, UnauthorizedError } from '../errors/HttpError';
 import { prisma } from '../lib/prisma';
 
-export async function requireAdmin(req: AuthRequest, res: Response, next: NextFunction) {
+export async function requireAdmin(req: AuthRequest, _res: Response, next: NextFunction) {
   try {
     if (!req.userId) {
       throw new UnauthorizedError('Authentication required');

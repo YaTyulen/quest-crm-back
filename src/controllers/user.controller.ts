@@ -15,7 +15,7 @@ export const userController = {
     res.status(200).json(user);
   }),
 
-  getAllUsers: asyncHandler(async (req: Request, res: Response) => {
+  getAllUsers: asyncHandler(async (_req: Request, res: Response) => {
     const users = await userService.getAllUsers();
     res.status(200).json(users);
   }),
@@ -27,8 +27,8 @@ export const userController = {
   }),
 
   createUser: asyncHandler(async (req: Request, res: Response) => {
-    const { name, email, password, systemRole, vkId } = req.body;
-    const user = await userService.createUser({ name, email, password, systemRole, vkId });
+    const { name, email, password, systemRole } = req.body;
+    const user = await userService.createUser({ name, email, password, systemRole });
     // const user = await userService.createUser({
     //   name: name.trim(),
     //   email: email.trim().toLowerCase(),

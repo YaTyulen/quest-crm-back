@@ -22,16 +22,27 @@ enum BusinessRole {
   ACTOR
 }
 
+// === Настройки системы (одна строка) ===
+model Settings {
+  id                      Int    @id @default(1)
+  availabilityHorizonDays Int  @default(14) // горизонт заполнения расписания
+
+  @@map("Settings")
+}
+
+
 model User {
-  id            Int      @id @default(autoincrement())
-  vkId          String?  @unique
-  name          String
-  email         String   @unique
-  passwordHash  String
-  systemRole    SystemRole @default(USER)
-  createdAt     DateTime @default(now())
-  businessRoles BusinessRoleOnUser[]  // Связь многие-ко-многим с бизнес-ролями
-  refreshTokens RefreshToken[]
+  id             Int      @id @default(autoincrement())
+  vkId           String?  @unique
+  name           String
+  email          String   @unique
+  passwordHash   String
+  systemRole     SystemRole @default(USER)
+  createdAt      DateTime @default(now())
+  businessRoles  BusinessRoleOnUser[]  // Связь многие-ко-многим с бизнес-ролями
+  refreshTokens  RefreshToken[]
+  availabilities Availability[]
+  quests         UserQuest[]
 }
 
 model RefreshToken {
@@ -55,8 +66,69 @@ model BusinessRoleOnUser {
 }
 
 model Quest {
-  id          Int      @id @default(autoincrement())
-  title       String   @unique
-  description String?
-  createdAt   DateTime @default(now())
+  id              Int      @id @default(autoincrement())
+  title           String
+  description     String?
+  operatorsNeeded Int      @default(1) // сколько операторов нужно на слот
+  actorsNeeded    Int      @default(1) // сколько актёров нужно на слот
+  createdAt       DateTime @default(now())
+
+  questSlots     QuestSlot[]
+  availabilities Availability[]
+  users          UserQuest[]
+
+  @@map("Quest")
+}
+
+// M:N: сотрудник работает на квесте
+model UserQuest {
+  userId  Int
+  questId Int
+  user    User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  quest   Quest @relation(fields: [questId], references: [id], onDelete: Cascade)
+
+  @@id([userId, questId])
+  @@map("UserQuest")
+}
+
+// === Шаблоны слотов (времена) ===
+model SlotTemplate {
+  id       Int     @id @default(autoincrement())
+  time     String  @unique // "10:00", "12:00", ...
+  order    Int     // для сортировки: 1, 2, 3...
+  isActive Boolean @default(true)
+
+  questSlots     QuestSlot[]
+  availabilities Availability[]
+
+  @@map("SlotTemplate")
+}
+
+// === Сетка слотов квеста (M:N между Quest и SlotTemplate) ===
+model QuestSlot {
+  id      Int          @id @default(autoincrement())
+  questId Int
+  quest   Quest        @relation(fields: [questId], references: [id], onDelete: Cascade)
+  slotId  Int
+  slot    SlotTemplate @relation(fields: [slotId], references: [id], onDelete: Cascade)
+
+  @@unique([questId, slotId])
+  @@map("QuestSlot")
+}
+
+// === Доступность сотрудника ===
+model Availability {
+  id      Int          @id @default(autoincrement())
+  userId  Int
+  user    User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  questId Int
+  quest   Quest        @relation(fields: [questId], references: [id], onDelete: Cascade)
+  slotId  Int
+  slot    SlotTemplate @relation(fields: [slotId], references: [id], onDelete: Cascade)
+  date    DateTime     // только дата, время 00:00:00
+  canWork Boolean      @default(true)
+
+  @@unique([userId, date, questId, slotId])
+  @@index([questId, date, slotId]) // для быстрых запросов обзора
+  @@map("Availability")
 }

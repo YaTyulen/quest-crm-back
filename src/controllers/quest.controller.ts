@@ -5,7 +5,7 @@ import { parseId } from '../utils/parseId';
 import { BadRequestError, NotFoundError } from '../errors/HttpError';
 
 export const questController = {
-    getAllQuests: asyncHandler(async (req: Request, res: Response) => {
+    getAllQuests: asyncHandler(async (_req: Request, res: Response) => {
         const quests = await questService.getAllQuests();
         res.status(200).json(quests);
     }),

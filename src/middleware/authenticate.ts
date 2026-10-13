@@ -13,7 +13,7 @@ export interface AuthRequest extends Request {
   userEmail?: string;
 }
 
-export function authenticate(req: AuthRequest, res: Response, next: NextFunction) {
+export function authenticate(req: AuthRequest, _res: Response, next: NextFunction) {
   // 1. Достаём заголовок Authorization
   const authHeader = req.headers.authorization;
 
