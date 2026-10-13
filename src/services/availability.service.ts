@@ -151,7 +151,6 @@ export const availabilityService = {
   },
 
   async getOverview(questId: number, from: string, to: string) {
-    // 1. Получаем квест с сеткой слотов
     const quest = await prisma.quest.findUnique({
       where: { id: questId },
       include: {
@@ -165,7 +164,6 @@ export const availabilityService = {
       throw new NotFoundError('Quest not found');
     }
 
-    // Сортируем слоты по порядку
     const sortedQuestSlots = [...quest.questSlots].sort(
       (a, b) => a.slot.order - b.slot.order
     );
@@ -173,12 +171,11 @@ export const availabilityService = {
     const fromDate = new Date(from + 'T00:00:00.000Z');
     const toDate = new Date(to + 'T00:00:00.000Z');
 
-    // 2. Получаем всю доступность за период для этого квеста
+    // берём все отметки
     const availabilities = await prisma.availability.findMany({
       where: {
         questId,
         date: { gte: fromDate, lte: toDate },
-        canWork: true,
       },
       include: {
         user: {
@@ -193,7 +190,7 @@ export const availabilityService = {
       },
     });
 
-    // 3. Строим карту: "YYYY-MM-DD_slotId" -> массив сотрудников
+    // Карта: "YYYY-MM-DD_slotId" -> массив записей доступности
     const map = new Map<string, typeof availabilities>();
     for (const av of availabilities) {
       const dateKey = av.date.toISOString().split('T')[0];
@@ -204,7 +201,6 @@ export const availabilityService = {
       map.get(key)!.push(av);
     }
 
-    // 4. Собираем ответ по дням
     const days = [];
     const cursor = new Date(fromDate);
     while (cursor <= toDate) {
@@ -212,29 +208,60 @@ export const availabilityService = {
 
       const slots = sortedQuestSlots.map((qs) => {
         const key = `${dateKey}_${qs.slotId}`;
-        const users = map.get(key) ?? [];
+        const records = map.get(key) ?? [];
 
-        // Разделяем на операторов и актёров по бизнес-ролям
-        const operators = users
-          .filter((u) =>
-            u.user.businessRoles.some((r) => r.businessRole === 'OPERATOR')
+        // Разделяем по ролям и по canWork
+        const operatorsAvailable = records
+          .filter(
+            (r) =>
+              r.canWork &&
+              r.user.businessRoles.some((br) => br.businessRole === 'OPERATOR')
           )
-          .map((u) => ({ id: u.user.id, name: u.user.name }));
+          .map((r) => ({ id: r.user.id, name: r.user.name }));
 
-        const actors = users
-          .filter((u) =>
-            u.user.businessRoles.some((r) => r.businessRole === 'ACTOR')
+        const operatorsUnavailable = records
+          .filter(
+            (r) =>
+              !r.canWork &&
+              r.user.businessRoles.some((br) => br.businessRole === 'OPERATOR')
           )
-          .map((u) => ({ id: u.user.id, name: u.user.name }));
+          .map((r) => ({ id: r.user.id, name: r.user.name }));
 
-        const operatorsOk = operators.length >= quest.operatorsNeeded;
-        const actorsOk = actors.length >= quest.actorsNeeded;
+        const actorsAvailable = records
+          .filter(
+            (r) =>
+              r.canWork &&
+              r.user.businessRoles.some((br) => br.businessRole === 'ACTOR')
+          )
+          .map((r) => ({ id: r.user.id, name: r.user.name }));
 
-        let status: 'covered' | 'understaffed' | 'empty';
-        if (operators.length === 0 && actors.length === 0) {
-          status = 'empty';
+        const actorsUnavailable = records
+          .filter(
+            (r) =>
+              !r.canWork &&
+              r.user.businessRoles.some((br) => br.businessRole === 'ACTOR')
+          )
+          .map((r) => ({ id: r.user.id, name: r.user.name }));
+
+        const operatorsOk = operatorsAvailable.length >= quest.operatorsNeeded;
+        const actorsOk = actorsAvailable.length >= quest.actorsNeeded;
+
+        // Статус: различаем "пусто" (никто не заполнил) и "все отказались"
+        const totalOperatorResponses =
+          operatorsAvailable.length + operatorsUnavailable.length;
+        const totalActorResponses = actorsAvailable.length + actorsUnavailable.length;
+
+        let status: 'covered' | 'understaffed' | 'empty' | 'declined';
+        if (totalOperatorResponses === 0 && totalActorResponses === 0) {
+          status = 'empty'; // никто не заполнил
         } else if (operatorsOk && actorsOk) {
           status = 'covered';
+        } else if (
+          operatorsAvailable.length === 0 &&
+          actorsAvailable.length === 0 &&
+          (totalOperatorResponses > 0 || totalActorResponses > 0)
+        ) {
+          status = 'declined'; // все, кто ответил, отказались
         } else {
           status = 'understaffed';
         }
@@ -244,16 +271,20 @@ export const availabilityService = {
           time: qs.slot.time,
           order: qs.slot.order,
           operators: {
-            available: operators.length,
+            available: operatorsAvailable.length,
+            unavailable: operatorsUnavailable.length,
             needed: quest.operatorsNeeded,
             ok: operatorsOk,
-            users: operators,
+            availableUsers: operatorsAvailable,
+            unavailableUsers: operatorsUnavailable,
           },
           actors: {
-            available: actors.length,
+            available: actorsAvailable.length,
+            unavailable: actorsUnavailable.length,
             needed: quest.actorsNeeded,
             ok: actorsOk,
-            users: actors,
+            availableUsers: actorsAvailable,
+            unavailableUsers: actorsUnavailable,
           },
           status,
         };
