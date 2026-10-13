@@ -20,5 +20,12 @@ export const saveMyAvailabilitySchema = z.object({
   ).min(1, 'At least one item is required'),
 });
 
+export const overviewQuerySchema = z.object({
+  questId: z.coerce.number().int().positive(),
+  from: z.string().regex(dateRegex, 'Date must be in YYYY-MM-DD format'),
+  to: z.string().regex(dateRegex, 'Date must be in YYYY-MM-DD format'),
+});
+
 export type GetMyAvailabilityQuery = z.infer<typeof getMyAvailabilityQuerySchema>;
 export type SaveMyAvailabilityInput = z.infer<typeof saveMyAvailabilitySchema>;
+export type OverviewQuery = z.infer<typeof overviewQuerySchema>;

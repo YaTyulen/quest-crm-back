@@ -149,4 +149,128 @@ export const availabilityService = {
 
     return { saved: data.items.length };
   },
+
+  async getOverview(questId: number, from: string, to: string) {
+    // 1. Получаем квест с сеткой слотов
+    const quest = await prisma.quest.findUnique({
+      where: { id: questId },
+      include: {
+        questSlots: {
+          include: { slot: true },
+        },
+      },
+    });
+
+    if (!quest) {
+      throw new NotFoundError('Quest not found');
+    }
+
+    // Сортируем слоты по порядку
+    const sortedQuestSlots = [...quest.questSlots].sort(
+      (a, b) => a.slot.order - b.slot.order
+    );
+
+    const fromDate = new Date(from + 'T00:00:00.000Z');
+    const toDate = new Date(to + 'T00:00:00.000Z');
+
+    // 2. Получаем всю доступность за период для этого квеста
+    const availabilities = await prisma.availability.findMany({
+      where: {
+        questId,
+        date: { gte: fromDate, lte: toDate },
+        canWork: true,
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            businessRoles: {
+              select: { businessRole: true },
+            },
+          },
+        },
+      },
+    });
+
+    // 3. Строим карту: "YYYY-MM-DD_slotId" -> массив сотрудников
+    const map = new Map<string, typeof availabilities>();
+    for (const av of availabilities) {
+      const dateKey = av.date.toISOString().split('T')[0];
+      const key = `${dateKey}_${av.slotId}`;
+      if (!map.has(key)) {
+        map.set(key, []);
+      }
+      map.get(key)!.push(av);
+    }
+
+    // 4. Собираем ответ по дням
+    const days = [];
+    const cursor = new Date(fromDate);
+    while (cursor <= toDate) {
+      const dateKey = cursor.toISOString().split('T')[0];
+
+      const slots = sortedQuestSlots.map((qs) => {
+        const key = `${dateKey}_${qs.slotId}`;
+        const users = map.get(key) ?? [];
+
+        // Разделяем на операторов и актёров по бизнес-ролям
+        const operators = users
+          .filter((u) =>
+            u.user.businessRoles.some((r) => r.businessRole === 'OPERATOR')
+          )
+          .map((u) => ({ id: u.user.id, name: u.user.name }));
+
+        const actors = users
+          .filter((u) =>
+            u.user.businessRoles.some((r) => r.businessRole === 'ACTOR')
+          )
+          .map((u) => ({ id: u.user.id, name: u.user.name }));
+
+        const operatorsOk = operators.length >= quest.operatorsNeeded;
+        const actorsOk = actors.length >= quest.actorsNeeded;
+
+        let status: 'covered' | 'understaffed' | 'empty';
+        if (operators.length === 0 && actors.length === 0) {
+          status = 'empty';
+        } else if (operatorsOk && actorsOk) {
+          status = 'covered';
+        } else {
+          status = 'understaffed';
+        }
+
+        return {
+          slotId: qs.slotId,
+          time: qs.slot.time,
+          order: qs.slot.order,
+          operators: {
+            available: operators.length,
+            needed: quest.operatorsNeeded,
+            ok: operatorsOk,
+            users: operators,
+          },
+          actors: {
+            available: actors.length,
+            needed: quest.actorsNeeded,
+            ok: actorsOk,
+            users: actors,
+          },
+          status,
+        };
+      });
+
+      days.push({ date: dateKey, slots });
+      cursor.setUTCDate(cursor.getUTCDate() + 1);
+    }
+
+    return {
+      quest: {
+        id: quest.id,
+        title: quest.title,
+        operatorsNeeded: quest.operatorsNeeded,
+        actorsNeeded: quest.actorsNeeded,
+      },
+      days,
+    };
+  }
 };

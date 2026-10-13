@@ -11,6 +11,14 @@ interface ValidatedRequest extends AuthRequest {
   };
 }
 
+interface ValidatedOverviewRequest extends AuthRequest {
+  validatedQuery?: {
+    questId: number;
+    from: string;
+    to: string;
+  };
+}
+
 export const availabilityController = {
   getMyAvailability: asyncHandler(async (req: ValidatedRequest, res: Response) => {
     const userId = req.userId!;
@@ -23,6 +31,12 @@ export const availabilityController = {
   saveMyAvailability: asyncHandler(async (req: AuthRequest, res: Response) => {
     const userId = req.userId!;
     const result = await availabilityService.saveMyAvailability(userId, req.body);
+    res.status(200).json(result);
+  }),
+
+  getOverview: asyncHandler(async (req: ValidatedOverviewRequest, res: Response) => {
+    const { questId, from, to } = req.validatedQuery!;
+    const result = await availabilityService.getOverview(questId, from, to);
     res.status(200).json(result);
   }),
 };
